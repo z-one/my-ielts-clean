@@ -1,0 +1,14 @@
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+*.log
+node_modules/
+dist/
+my-ielts-app/
+.DS_Store
+frontend/public/179_audios/
+frontend/public/vocabulary/
+asset-packages/
+data/
+*.db

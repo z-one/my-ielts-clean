@@ -1,0 +1,16 @@
+.git
+.idea
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+**/node_modules
+**/dist
+**/build
+**/.DS_Store
+backend/logs
+backend/*.log
+backend/uvicorn-dev*.log
+docker/backend/logs
+docs/project-architecture-ppt
