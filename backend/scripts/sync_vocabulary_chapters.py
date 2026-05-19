@@ -13,7 +13,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from import_youdao_wordbook import load_database_url  # noqa: E402
+from import_youdao_wordbook_raw import load_database_url  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
