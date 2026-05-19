@@ -125,15 +125,14 @@ def get_chapter_details(
 
 @router.get("/words", response_model=List[VocabularyWordResponse])
 def get_words(
-    chapter_name: Optional[str] = None,
+    chapter_name: str = Query(..., description="章节名称，必传"),
     source: Optional[str] = Query(default=None, pattern="^(system|custom|youdao)$"),
     current_user=Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ):
     """按章节获取词库单词；未登录时只返回系统词。"""
     query = visible_words_query(db, current_user)
-    if chapter_name:
-        query = query.filter(VocabularyWord.chapter_name == chapter_name)
+    query = query.filter(VocabularyWord.chapter_name == chapter_name)
     if source:
         query = query.filter(VocabularyWord.source == source)
     words = query.order_by(VocabularyWord.id.asc()).all()

@@ -291,18 +291,28 @@ export function buildChapterStatusMap(progressList = []) {
 
 export async function loadBackendVocabulary({ includeProgress = isAuthenticated(), chapterName = null } = {}) {
   try {
-    const baseRequests = [
-      loadChapterDetailsWithCache(),
-      vocabularyAPI.getWords(chapterName ? { chapterName } : {}),  // 支持按章节加载词汇
-    ]
+    const chapterDetails = await loadChapterDetailsWithCache()
+
+    // 按章节加载词汇
+    const chapterNames = chapterName
+      ? [chapterName]
+      : chapterDetails.map(ch => ch.chapter_name)
+
+    const wordsArrays = await Promise.all(
+      chapterNames.map(name => vocabularyAPI.getWords({ chapterName: name })),
+    )
+    const words = wordsArrays.flat()
+
+    const baseRequests = []
 
     if (includeProgress) {
       baseRequests.push(chaptersAPI.getAllProgress())
-      // 按章节加载进度，或加载全部
       baseRequests.push(wordsAPI.getAllProgress(chapterName))
     }
 
-    const [chapterDetails, words, chapterProgress = [], wordProgress = []] = await Promise.all(baseRequests)
+    const [chapterProgress = [], wordProgress = []] = baseRequests.length
+      ? await Promise.all(baseRequests)
+      : [[], []]
     const vocabulary = applyVocabularyProgress(buildVocabularyFromBackend(words, chapterDetails), wordProgress)
     const chapterStatus = buildChapterStatusMap(chapterProgress)
 

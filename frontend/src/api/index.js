@@ -151,10 +151,11 @@ export const vocabularyAPI = {
     const query = new URLSearchParams()
     if (params.chapterName)
       query.set('chapter_name', params.chapterName)
+    else
+      throw new Error('chapterName is required for getWords')
     if (params.source)
       query.set('source', params.source)
-    const suffix = query.toString() ? `?${query.toString()}` : ''
-    return get(`/api/vocabulary/words${suffix}`)
+    return get(`/api/vocabulary/words?${query.toString()}`)
   },
   search: query => get(`/api/vocabulary/search?q=${encodeURIComponent(query)}`),
   createCustomWord: wordData => post('/api/vocabulary/custom-words', wordData),
