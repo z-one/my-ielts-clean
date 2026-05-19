@@ -371,6 +371,10 @@ def import_to_db(
 
 
 def load_database_url() -> str:
+    # Check environment variable first
+    env_url = os.environ.get("DATABASE_URL")
+    if env_url:
+        return env_url
     env_path = BACKEND_DIR / ".env"
     if env_path.exists():
         for line in env_path.read_text(encoding="utf-8").splitlines():
