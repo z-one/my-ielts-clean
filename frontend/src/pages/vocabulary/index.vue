@@ -1,8 +1,8 @@
 <!-- eslint-disable eslint-comments/no-unlimited-disable -->
 <script setup generic="T extends any, O extends any">
 import { loadUserSettings as loadUserSettingsFromBackend, syncUserSettings, syncWordProgress, updateChapterStatus, updateWordFocusLevel } from '../../services/sync'
-import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterList, loadChapterWords, clearChapterWordsCache } from '../../services/vocabulary'
-import { chaptersAPI } from '../../api'
+import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterList, loadChapterWords, clearChapterWordsCache, buildChapterStatusMap } from '../../services/vocabulary'
+import { chaptersAPI, wordsAPI } from '../../api'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
@@ -99,10 +99,44 @@ async function loadChapter(chapterName) {
     // 如果是当前章节，重新初始化
     if (category.value === chapterName) {
       initWordProperties()
+      // 加载该章节的单词进度（已登录用户）
+      if (authStore.isAuthenticated) {
+        await loadChapterWordProgress(chapterName)
+      }
     }
   }
   catch (error) {
     console.error(`加载章节 ${chapterName} 失败:`, error)
+  }
+}
+
+// 加载指定章节的单词进度
+async function loadChapterWordProgress(chapterName) {
+  try {
+    const progressList = await wordsAPI.getChapterProgress(chapterName)
+    const progressMap = new Map(progressList.map(p => [p.word_id, p]))
+
+    const chapter = refVocabulary[chapterName]
+    if (!chapter?.words)
+      return
+
+    for (const group of chapter.words) {
+      for (const item of group) {
+        const saved = progressMap.get(item.id)
+        if (saved) {
+          item.spellValue = saved.spell_value || ''
+          item.spellError = saved.spell_error || false
+          item.correctCount = saved.correct_count || 0
+          item.errorCount = saved.error_count || 0
+          item.showSource = saved.show_source || false
+          item.focusLevel = saved.focus_level ?? 0
+          wordShowSourceMap.set(item.id, saved.show_source || false)
+        }
+      }
+    }
+  }
+  catch (error) {
+    console.error(`加载章节 ${chapterName} 单词进度失败:`, error)
   }
 }
 
