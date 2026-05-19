@@ -331,14 +331,14 @@ def import_to_db(
 
                 if existing and replace_existing:
                     existing.group_name = item["group_name"]
-                existing.pos = item["pos"]
-                existing.meaning = item["meaning"]
-                existing.example = item["example"]
-                existing.extra = item["extra"]
-                existing.word_variants = json.dumps(item.get("word_variants") or item["word"], ensure_ascii=False)
-                existing.metadata_json = item.get("metadata", "")
-                replaced += 1
-                continue
+                    existing.pos = item["pos"]
+                    existing.meaning = item["meaning"]
+                    existing.example = item["example"]
+                    existing.extra = item["extra"]
+                    existing.word_variants = json.dumps(item.get("word_variants") or item["word"], ensure_ascii=False)
+                    existing.metadata_json = item.get("metadata", "")
+                    replaced += 1
+                    continue
 
                 db.add(
                     VocabularyWord(
