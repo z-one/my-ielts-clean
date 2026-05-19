@@ -1,7 +1,7 @@
 <!-- eslint-disable eslint-comments/no-unlimited-disable -->
 <script setup generic="T extends any, O extends any">
 import { loadUserSettings as loadUserSettingsFromBackend, syncUserSettings, syncWordProgress, updateChapterStatus, updateWordFocusLevel } from '../../services/sync'
-import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterList, loadChapterWords, clearChapterWordsCache, buildChapterStatusMap } from '../../services/vocabulary'
+import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterWords, clearChapterWordsCache, buildChapterStatusMap, loadChapterDetailsWithCache } from '../../services/vocabulary'
 import { chaptersAPI, wordsAPI } from '../../api'
 import { useAuthStore } from '~/stores/auth'
 
@@ -63,19 +63,20 @@ function replaceVocabulary(nextVocabulary) {
 
 async function loadVocabularyData() {
   try {
-    // 1. 只加载章节列表（很快）
-    chapterDetails.value = await loadChapterList()
-    chapters.value = chapterDetails.value.map(ch => ch.chapter_name)
+    // 1. 加载章节详情（很快）
+    const details = await loadChapterDetailsWithCache()
+    chapterDetails.value = details
+    chapters.value = details.map(ch => ch.chapter_name)
 
     const savedChapter = localStorage.getItem(CHAPTER_KEY)
     category.value = savedChapter && chapters.value.includes(savedChapter) ? savedChapter : chapters.value[0]
 
-    // 2. 加载第一个章节的词汇
+    // 2. 优先加载选中章节的词汇和进度
     if (category.value) {
       await loadChapter(category.value)
     }
 
-    // 3. 加载章节进度
+    // 3. 加载全部章节进度（用于章节列表状态显示）
     if (authStore.isAuthenticated) {
       const progressResult = await chaptersAPI.getAllProgress()
       chapterLearnStatus.value = buildChapterStatusMap(progressResult) || {}
@@ -96,10 +97,9 @@ async function loadChapter(chapterName) {
     refVocabulary[chapterName] = chapterData
     loadedChapters.value.add(chapterName)
 
-    // 如果是当前章节，重新初始化
+    // 如果是当前章节，重新初始化并加载该章节的单词进度
     if (category.value === chapterName) {
       initWordProperties()
-      // 加载该章节的单词进度（已登录用户）
       if (authStore.isAuthenticated) {
         await loadChapterWordProgress(chapterName)
       }

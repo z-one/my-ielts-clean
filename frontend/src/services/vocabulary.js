@@ -245,7 +245,7 @@ export async function loadChapterWords(chapterName, chapterDetails = []) {
   return result
 }
 
-async function loadChapterDetailsWithCache() {
+export async function loadChapterDetailsWithCache() {
   const cached = readChapterCache()
   if (cached)
     return cached
@@ -289,16 +289,17 @@ export function buildChapterStatusMap(progressList = []) {
   }, {})
 }
 
-export async function loadBackendVocabulary({ includeProgress = isAuthenticated() } = {}) {
+export async function loadBackendVocabulary({ includeProgress = isAuthenticated(), chapterName = null } = {}) {
   try {
     const baseRequests = [
       loadChapterDetailsWithCache(),
-      vocabularyAPI.getWords(),
+      vocabularyAPI.getWords(chapterName ? { chapterName } : {}),  // 支持按章节加载词汇
     ]
 
     if (includeProgress) {
       baseRequests.push(chaptersAPI.getAllProgress())
-      baseRequests.push(wordsAPI.getAllProgress())
+      // 按章节加载进度，或加载全部
+      baseRequests.push(wordsAPI.getAllProgress(chapterName))
     }
 
     const [chapterDetails, words, chapterProgress = [], wordProgress = []] = await Promise.all(baseRequests)
