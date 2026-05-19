@@ -20,7 +20,7 @@ from psycopg2.extras import execute_values
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 # Columns that should be converted from SQLite int (0/1) to Postgres boolean
-BOOL_COLUMNS = {"is_active", "auto_play_audio", "show_meaning", "show_source"}
+BOOL_COLUMNS = {"is_active", "auto_play_audio", "show_meaning", "show_source", "spell_error", "spell_value"}
 
 
 TABLES = [
