@@ -5,6 +5,11 @@ const CHAPTER_CACHE_KEY = 'vocabulary_chapter_details_cache_v1'
 const CHAPTER_CACHE_VERSION = 1
 const CHAPTER_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 
+// 章节词汇缓存
+const CHAPTER_WORDS_CACHE_KEY = 'vocabulary_chapter_words_cache_v1'
+const CHAPTER_WORDS_CACHE_VERSION = 1
+const CHAPTER_WORDS_CACHE_TTL = 30 * 60 * 1000 // 30分钟
+
 const CUSTOM_CHAPTER_NAME = '23 - 自添加生词'
 
 export function normalizeBackendWord(item) {
@@ -117,6 +122,129 @@ export function clearVocabularyChapterCache() {
   localStorage.removeItem(CHAPTER_CACHE_KEY)
 }
 
+// ========== 章节词汇缓存 ==========
+
+function readChapterWordsCache(chapterName) {
+  try {
+    const rawCache = localStorage.getItem(CHAPTER_WORDS_CACHE_KEY)
+    if (!rawCache)
+      return null
+
+    const cache = JSON.parse(rawCache)
+    if (
+      cache.version !== CHAPTER_WORDS_CACHE_VERSION
+      || !cache.data
+      || !cache.data[chapterName]
+      || Date.now() - cache.savedAt > CHAPTER_WORDS_CACHE_TTL
+    ) {
+      return null
+    }
+
+    return cache.data[chapterName]
+  }
+  catch (error) {
+    console.warn('读取章节词汇缓存失败:', error)
+    return null
+  }
+}
+
+function writeChapterWordsCache(chapterName, words) {
+  try {
+    const rawCache = localStorage.getItem(CHAPTER_WORDS_CACHE_KEY)
+    let cache = { version: CHAPTER_WORDS_CACHE_VERSION, savedAt: Date.now(), data: {} }
+
+    if (rawCache) {
+      try {
+        const existing = JSON.parse(rawCache)
+        if (existing.version === CHAPTER_WORDS_CACHE_VERSION) {
+          cache = existing
+          cache.savedAt = Date.now()
+        }
+      }
+      catch {
+        // ignore
+      }
+    }
+
+    cache.data[chapterName] = words
+    localStorage.setItem(CHAPTER_WORDS_CACHE_KEY, JSON.stringify(cache))
+  }
+  catch (error) {
+    console.warn('写入章节词汇缓存失败:', error)
+  }
+}
+
+export function clearChapterWordsCache(chapterName = null) {
+  if (chapterName) {
+    // 只清除指定章节
+    try {
+      const rawCache = localStorage.getItem(CHAPTER_WORDS_CACHE_KEY)
+      if (rawCache) {
+        const cache = JSON.parse(rawCache)
+        if (cache.data && cache.data[chapterName]) {
+          delete cache.data[chapterName]
+          localStorage.setItem(CHAPTER_WORDS_CACHE_KEY, JSON.stringify(cache))
+        }
+      }
+    }
+    catch {
+      localStorage.removeItem(CHAPTER_WORDS_CACHE_KEY)
+    }
+  }
+  else {
+    // 清除全部
+    localStorage.removeItem(CHAPTER_WORDS_CACHE_KEY)
+  }
+}
+
+// ========== 按章节加载词汇 ==========
+
+export async function loadChapterWords(chapterName, chapterDetails = []) {
+  // 1. 检查缓存
+  const cached = readChapterWordsCache(chapterName)
+  if (cached)
+    return cached
+
+  // 2. 从后端加载
+  const words = await vocabularyAPI.getWords(chapterName)
+  const normalized = words.map(normalizeBackendWord)
+
+  // 3. 按组组织
+  const detailMap = new Map(chapterDetails.map(item => [item.chapter_name, item]))
+  const detail = detailMap.get(chapterName)
+
+  const groupIndexes = new Map()
+  const groups = []
+
+  for (const rawWord of normalized) {
+    const groupName = rawWord.label || `${chapterName} 默认组`
+    let groupIndex = groupIndexes.get(groupName)
+
+    if (groupIndex === undefined) {
+      groupIndex = groups.length
+      groupIndexes.set(groupName, groupIndex)
+      const group = []
+      group.label = groupName
+      groups.push(group)
+    }
+
+    groups[groupIndex].push(rawWord)
+  }
+
+  const result = {
+    label: detail?.label || chapterName,
+    audio: detail?.audio || '',
+    groupCount: groups.length,
+    wordCount: normalized.length,
+    words: groups,
+  }
+
+  // 4. 写入缓存
+  writeChapterWordsCache(chapterName, result)
+
+  return result
+}
+
 async function loadChapterDetailsWithCache() {
   const cached = readChapterCache()
   if (cached)
@@ -201,6 +329,13 @@ export async function loadBackendVocabulary({ includeProgress = isAuthenticated(
 export async function searchBackendVocabulary(query) {
   const words = await vocabularyAPI.search(query)
   return words.map(normalizeBackendWord)
+}
+
+// ========== 仅加载章节列表（不加载词汇） ==========
+
+export async function loadChapterList() {
+  const chapterDetails = await loadChapterDetailsWithCache()
+  return chapterDetails.map(ch => ch.chapter_name)
 }
 
 export async function createBackendCustomWords({ words, pos, meaning, example }) {

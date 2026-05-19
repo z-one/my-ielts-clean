@@ -1,7 +1,8 @@
 <!-- eslint-disable eslint-comments/no-unlimited-disable -->
 <script setup generic="T extends any, O extends any">
 import { loadUserSettings as loadUserSettingsFromBackend, syncUserSettings, syncWordProgress, updateChapterStatus, updateWordFocusLevel } from '../../services/sync'
-import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadBackendVocabulary } from '../../services/vocabulary'
+import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterList, loadChapterWords, clearChapterWordsCache } from '../../services/vocabulary'
+import { chaptersAPI } from '../../api'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
@@ -48,6 +49,8 @@ const category = ref(localStorage.getItem(CHAPTER_KEY) || chapters.value[0])
 
 const loaded = ref(false)
 const refVocabulary = shallowReactive({})
+const loadedChapters = ref(new Set()) // 已加载的章节
+const chapterDetails = ref([]) // 章节详情
 
 function replaceVocabulary(nextVocabulary) {
   for (const key of Object.keys(refVocabulary))
@@ -59,12 +62,47 @@ function replaceVocabulary(nextVocabulary) {
 }
 
 async function loadVocabularyData() {
-  const result = await loadBackendVocabulary({ includeProgress: authStore.isAuthenticated })
-  if (Object.keys(result.vocabulary).length > 0)
-    replaceVocabulary(result.vocabulary)
-  if (authStore.isAuthenticated) {
-    chapterLearnStatus.value = result.chapterStatus || {}
-    localStorage.setItem(CHAPTER_STATUS_KEY, JSON.stringify(chapterLearnStatus.value))
+  try {
+    // 1. 只加载章节列表（很快）
+    chapterDetails.value = await loadChapterList()
+    chapters.value = chapterDetails.value.map(ch => ch.chapter_name)
+
+    const savedChapter = localStorage.getItem(CHAPTER_KEY)
+    category.value = savedChapter && chapters.value.includes(savedChapter) ? savedChapter : chapters.value[0]
+
+    // 2. 加载第一个章节的词汇
+    if (category.value) {
+      await loadChapter(category.value)
+    }
+
+    // 3. 加载章节进度
+    if (authStore.isAuthenticated) {
+      const progressResult = await chaptersAPI.getAllProgress()
+      chapterLearnStatus.value = buildChapterStatusMap(progressResult) || {}
+      localStorage.setItem(CHAPTER_STATUS_KEY, JSON.stringify(chapterLearnStatus.value))
+    }
+  }
+  catch (error) {
+    console.error('加载章节列表失败:', error)
+  }
+}
+
+async function loadChapter(chapterName) {
+  if (loadedChapters.value.has(chapterName))
+    return
+
+  try {
+    const chapterData = await loadChapterWords(chapterName, chapterDetails.value)
+    refVocabulary[chapterName] = chapterData
+    loadedChapters.value.add(chapterName)
+
+    // 如果是当前章节，重新初始化
+    if (category.value === chapterName) {
+      initWordProperties()
+    }
+  }
+  catch (error) {
+    console.error(`加载章节 ${chapterName} 失败:`, error)
   }
 }
 
@@ -204,6 +242,9 @@ const wordList = computed(() => {
 watch(category, async (newVal, oldVal) => {
   // console.log(newVal, oldVal)
   localStorage.setItem(CHAPTER_KEY, newVal)
+
+  // 加载该章节的词汇（如果有缓存则直接使用）
+  await loadChapter(newVal)
 
   // 登录用户的进度已经在加载词库时一次性合并；未登录继续使用本地数据。
   if (!authStore.isAuthenticated)
