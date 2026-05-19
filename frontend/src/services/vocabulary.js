@@ -206,7 +206,7 @@ export async function loadChapterWords(chapterName, chapterDetails = []) {
     return cached
 
   // 2. 从后端加载
-  const words = await vocabularyAPI.getWords(chapterName)
+  const words = await vocabularyAPI.getWords({ chapterName })
   const normalized = words.map(normalizeBackendWord)
 
   // 3. 按组组织
