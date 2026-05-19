@@ -16,17 +16,15 @@ router = APIRouter(prefix="/api/words", tags=["单词进度"])
 
 @router.get("/progress", response_model=List[WordProgressResponse])
 def get_words_progress(
-    chapter: str = None,
+    chapter: str = Query(..., description="章节名称，必传"),
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取用户单词进度，可选按章节筛选"""
-    query = db.query(WordProgress).filter(
-        WordProgress.user_id == current_user.id
-    )
-    if chapter:
-        query = query.filter(WordProgress.chapter_name == chapter)
-    progress = query.all()
+    """获取用户单词进度，按章节筛选"""
+    progress = db.query(WordProgress).filter(
+        WordProgress.user_id == current_user.id,
+        WordProgress.chapter_name == chapter
+    ).all()
     return progress
 
 

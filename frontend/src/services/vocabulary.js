@@ -303,16 +303,18 @@ export async function loadBackendVocabulary({ includeProgress = isAuthenticated(
     )
     const words = wordsArrays.flat()
 
-    const baseRequests = []
+    let chapterProgress = []
+    let wordProgress = []
 
     if (includeProgress) {
-      baseRequests.push(chaptersAPI.getAllProgress())
-      baseRequests.push(wordsAPI.getAllProgress(chapterName))
+      const progressArrays = await Promise.all(
+        chapterNames.map(name => wordsAPI.getAllProgress(name)),
+      )
+      wordProgress = progressArrays.flat()
+
+      chapterProgress = await chaptersAPI.getAllProgress()
     }
 
-    const [chapterProgress = [], wordProgress = []] = baseRequests.length
-      ? await Promise.all(baseRequests)
-      : [[], []]
     const vocabulary = applyVocabularyProgress(buildVocabularyFromBackend(words, chapterDetails), wordProgress)
     const chapterStatus = buildChapterStatusMap(chapterProgress)
 

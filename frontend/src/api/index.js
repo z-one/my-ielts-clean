@@ -127,8 +127,11 @@ export const chaptersAPI = {
 
 // 单词 API
 export const wordsAPI = {
-  // 获取单词进度，可选按章节筛选
-  getAllProgress: (chapter = null) => get(chapter ? `/api/words/progress?chapter=${encodeURIComponent(chapter)}` : '/api/words/progress'),
+  // 获取单词进度，按章节筛选
+  getAllProgress: (chapter) => {
+    if (!chapter) throw new Error('chapter is required for getAllProgress')
+    return get(`/api/words/progress?chapter=${encodeURIComponent(chapter)}`)
+  },
 
   // 获取指定章节单词进度
   getChapterProgress: (chapterName) => get(`/api/words/${chapterName}/progress`),
