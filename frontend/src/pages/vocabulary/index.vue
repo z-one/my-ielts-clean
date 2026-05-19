@@ -280,9 +280,14 @@ watch(category, async (newVal, oldVal) => {
   // 加载该章节的词汇（如果有缓存则直接使用）
   await loadChapter(newVal)
 
-  // 登录用户的进度已经在加载词库时一次性合并；未登录继续使用本地数据。
-  if (!authStore.isAuthenticated)
+  // 登录用户：重新加载该章节的单词进度（切换章节时需要刷新进度）
+  if (authStore.isAuthenticated) {
+    await loadChapterWordProgress(newVal)
+  }
+  else {
+    // 未登录继续使用本地数据
     await loadProgress()
+  }
 })
 
 // 保存练习进度
