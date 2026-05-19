@@ -37,6 +37,7 @@ services:
     networks:
       - ielts-network
     volumes:
+      - ../backend:/app/backend
       - backend-logs:/app/backend/logs
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
