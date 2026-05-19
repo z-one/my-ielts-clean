@@ -19,6 +19,10 @@ from psycopg2.extras import execute_values
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
+# Columns that should be converted from SQLite int (0/1) to Postgres boolean
+BOOL_COLUMNS = {"is_active", "auto_play_audio", "show_meaning", "show_source"}
+
+
 TABLES = [
     {
         "name": "users",
@@ -125,7 +129,16 @@ def read_rows(conn: sqlite3.Connection, table: dict[str, Any]) -> tuple[list[str
         return [], []
     quoted_columns = ", ".join(f'"{column}"' for column in columns)
     query = f'SELECT {quoted_columns} FROM "{table["name"]}" {table["where"]}'
-    return columns, [tuple(row) for row in conn.execute(query).fetchall()]
+
+    bool_indices = [i for i, col in enumerate(columns) if col in BOOL_COLUMNS]
+    rows = []
+    for row in conn.execute(query).fetchall():
+        row = list(row)
+        for i in bool_indices:
+            if row[i] is not None:
+                row[i] = bool(row[i])
+        rows.append(tuple(row))
+    return columns, rows
 
 
 def delete_target_data(pg_conn: Any) -> None:
