@@ -115,9 +115,9 @@ export async function syncWordProgress(chapterName, progressData = null) {
       words: {},
     }
 
-    // 如果没有提供进度数据，从统一词库服务中收集。
+    // 如果没有提供进度数据，只从当前章节收集，避免同步时加载全量词库。
     if (!progressData) {
-      const { vocabulary } = await loadBackendVocabulary({ includeProgress: true })
+      const { vocabulary } = await loadBackendVocabulary({ includeProgress: true, chapterName })
       const chapterData = vocabulary[chapterName]
       if (!chapterData || !chapterData.words) {
         console.log(`章节 "${chapterName}" 不存在或没有单词`)
@@ -145,26 +145,9 @@ export async function syncWordProgress(chapterName, progressData = null) {
       }
     }
     else {
-      const fallbackResult = await loadBackendVocabulary({ includeProgress: false })
-      const chapterData = fallbackResult.vocabulary[chapterName]
       // 使用提供的进度数据
       for (const [wordId, wordData] of Object.entries(progressData.words)) {
         const transformed = transformWordData(wordData)
-
-        // 如果 spell_value 为空，从 vocabulary 中查找单词原词
-        if (!transformed.spell_value || transformed.spell_value === '') {
-          if (chapterData && chapterData.words) {
-            for (const group of chapterData.words) {
-              for (const item of group) {
-                if (String(item.id) === String(wordId) && item.word && item.word.length > 0) {
-                  transformed.spell_value = item.word[0]
-                  break
-                }
-              }
-            }
-          }
-        }
-
         syncData.words[wordId] = transformed
       }
     }

@@ -41,6 +41,7 @@ const wordsPerPage = ref(Math.max(1, Number.parseInt(localStorage.getItem('vocab
 const wordShowSourceMap = reactive(new Map())
 // 使用 Map 存储每个单词是否已经输入过，用于控制样式显示
 const wordHasInputMap = reactive(new Map())
+const wordSubmittedValueMap = new Map()
 
 const trainingStats = ref('')
 const chapters = ref([])
@@ -298,6 +299,39 @@ async function saveProgress() {
   localStorage.setItem(chapterProgressKey, JSON.stringify(progress))
 }
 
+function buildWordProgressData(item) {
+  const showSource = wordShowSourceMap.get(item.id) || false
+  item.showSource = showSource
+
+  return {
+    spellValue: item.spellValue || '',
+    spellError: item.spellError || false,
+    correctCount: item.correctCount || 0,
+    errorCount: item.errorCount || 0,
+    showSource: showSource || false,
+    focusLevel: item.focusLevel ?? 0,
+  }
+}
+
+async function saveSingleWordProgress(item) {
+  if (!authStore.isAuthenticated) {
+    saveProgress()
+    return
+  }
+
+  try {
+    await syncWordProgress(category.value, {
+      chapter: category.value,
+      words: {
+        [item.id]: buildWordProgressData(item),
+      },
+    })
+  }
+  catch (error) {
+    console.error('同步单词进度失败:', error)
+  }
+}
+
 // 应用进度数据到单词（用于后端加载的数据）
 function applyProgress(progress) {
   if (progress.chapter !== category.value)
@@ -462,8 +496,7 @@ function setWordFocusLevel(item, level) {
 function toggleShowSource(item) {
   const currentValue = wordShowSourceMap.get(item.id) || false
   wordShowSourceMap.set(item.id, !currentValue)
-  // 保存进度（未登录用户也允许保存到本地）
-  saveProgress()
+  saveSingleWordProgress(item)
 }
 
 // 判断是否显示原词
@@ -711,14 +744,17 @@ function copyText(item) {
 function onInputKeydown(e) {
   e.stopPropagation()
   const { key, target } = e
-  if (key === 'Enter') {
+  if (key === 'Enter' || key === 'Tab') {
     // 触发验证（获取对应的item）
     const item = findItemById(target.id)
-    if (item)
-      validateInput(target, item)
+    if (item) {
+      validateInput(target, item, { countAttempt: true })
+      saveSingleWordProgress(item)
+    }
 
     // 切换到下一个 input
-    document.getElementById((Number(target.id) + 1).toString())?.focus()
+    if (key === 'Enter')
+      document.getElementById((Number(target.id) + 1).toString())?.focus()
   }
 }
 
@@ -745,24 +781,7 @@ function onInputFoucsIn(e, audioPath) {
 }
 
 function onInputFoucsOut(e, item) {
-  const { target } = e
-  const spellValue = target.value.toLowerCase().trim()
-  if (spellValue.length < 1) {
-    item.spellValue = ''
-  }
-  else {
-    const isCorrect = item.word.map(v => v.toLowerCase().trim()).includes(spellValue)
-    item.spellValue = spellValue
-    item.spellError = !isCorrect
-
-    // 如果答对了，增加正确计数；如果答错了，增加错误计数
-    if (isCorrect && !item.spellError)
-      item.correctCount = (item.correctCount || 0) + 1
-    else if (!isCorrect && item.spellError)
-      item.errorCount = (item.errorCount || 0) + 1
-  }
-  trainingStats.value = calcStats()
-  saveProgress() // 保存进度
+  validateInput(e.target, item, { countAttempt: false })
 }
 
 function getInputStyleClass(item) {
@@ -792,14 +811,14 @@ function findItemById(id) {
   const words = refVocabulary[category.value].words
   for (const group of words) {
     for (const item of group) {
-      if (item.id === id)
+      if (String(item.id) === String(id))
         return item
     }
   }
   return null
 }
 
-function validateInput(target, item) {
+function validateInput(target, item, { countAttempt = false } = {}) {
   const spellValue = target.value.toLowerCase().trim()
   if (spellValue.length < 1) {
     item.spellValue = ''
@@ -810,12 +829,16 @@ function validateInput(target, item) {
     item.spellValue = spellValue
     item.spellError = !isCorrect
 
-    // 如果答对了，增加正确计数
-    if (isCorrect && !item.spellError)
-      item.correctCount = (item.correctCount || 0) + 1
+    if (countAttempt && wordSubmittedValueMap.get(item.id) !== spellValue) {
+      if (isCorrect)
+        item.correctCount = (item.correctCount || 0) + 1
+      else
+        item.errorCount = (item.errorCount || 0) + 1
+
+      wordSubmittedValueMap.set(item.id, spellValue)
+    }
   }
   trainingStats.value = calcStats()
-  saveProgress() // 保存进度
 }
 
 function copyAllError() {
@@ -1561,7 +1584,7 @@ watch(
                       第 {{ currentPage }} / {{ totalPages }} 组 (每页{{ wordsPerPage.value }}组)
                     </div>
                     <div v-if="refVocabulary[category]?.audio" class="flex justify-center">
-                      <audio :key="`audio-${category}`" controls class="max-w-xs w-full">
+                      <audio :key="`audio-${category}`" controls preload="none" class="max-w-xs w-full">
                         <source :src="`vocabulary/audio/${refVocabulary[category].audio}`" type="audio/mpeg">
                       </audio>
                     </div>
@@ -1738,7 +1761,7 @@ watch(
                           </span>
                         </div>
                         <div v-if="refVocabulary[category]?.audio" class="justify-items-end">
-                          <audio :key="`audio-${category}`" controls class="chapter">
+                          <audio :key="`audio-${category}`" controls preload="none" class="chapter">
                             <source :src="`vocabulary/audio/${refVocabulary[category].audio}`" type="audio/mpeg">
                           </audio>
                         </div>

@@ -1,4 +1,4 @@
-import { syncChapterStatus, syncWordProgress, syncUserSettings } from './sync'
+import { syncChapterStatus, syncUserSettings } from './sync'
 
 /**
  * 自动同步服务
@@ -6,7 +6,6 @@ import { syncChapterStatus, syncWordProgress, syncUserSettings } from './sync'
  * 这样可以避免不必要的网络请求和数据覆盖
  */
 
-let currentChapter = null
 const CHANGELISTEN_EVENT = 'sync-needed' // 自定义事件名称
 
 /**
@@ -27,8 +26,9 @@ export function stopAutoSync() {
 /**
  * 设置当前章节(用于自动同步)
  */
-export function setCurrentChapter(chapterName) {
-  currentChapter = chapterName
+export function setCurrentChapter(_chapterName) {
+  // 单词进度改为在 Enter/Tab 切换单词时按单词同步。
+  // 保留这个入口，避免旧调用方报错。
 }
 
 /**
@@ -51,11 +51,6 @@ async function handleSyncNeeded() {
   try {
     // 同步章节状态
     await syncChapterStatus()
-
-    // 同步单词进度(当前章节)
-    if (currentChapter) {
-      await syncWordProgress(currentChapter)
-    }
 
     // 同步用户设置
     await syncUserSettings()
