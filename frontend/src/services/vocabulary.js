@@ -200,6 +200,9 @@ export function clearChapterWordsCache(chapterName = null) {
 // ========== 按章节加载词汇 ==========
 
 export async function loadChapterWords(chapterName, chapterDetails = []) {
+  if (!chapterName)
+    throw new Error('chapterName is required before loading vocabulary words')
+
   // 1. 检查缓存
   const cached = readChapterWordsCache(chapterName)
   if (cached)
@@ -297,6 +300,14 @@ export async function loadBackendVocabulary({ includeProgress = isAuthenticated(
     const chapterNames = chapterName
       ? [chapterName]
       : chapterDetails.map(ch => ch.chapter_name)
+
+    if (chapterNames.length === 0) {
+      return {
+        vocabulary: {},
+        chapterStatus: {},
+        fromFallback: false,
+      }
+    }
 
     const wordsArrays = await Promise.all(
       chapterNames.map(name => vocabularyAPI.getWords({ chapterName: name })),

@@ -128,11 +128,13 @@ export const chaptersAPI = {
 // 单词 API
 export const wordsAPI = {
   // 获取单词进度，按章节筛选
-  getAllProgress: (chapter) => {
-    if (!chapterName) throw new Error('chapterName is required for getWordsProgress');
-    const query = new URLSearchParams();
-    query.set('chapter', chapterName);
-    return get(`/api/words/progress?${query.toString()}`);
+  getAllProgress: (chapterName) => {
+    if (!chapterName)
+      throw new Error('chapterName is required for getWordsProgress')
+
+    const query = new URLSearchParams()
+    query.set('chapter', chapterName)
+    return get(`/api/words/progress?${query.toString()}`)
   },
 
   // 获取指定章节单词进度
@@ -153,10 +155,15 @@ export const vocabularyAPI = {
   getChapters: () => get('/api/vocabulary/chapters'),
   getChapterDetails: (source) => get(`/api/vocabulary/chapter-details${source ? `?source=${encodeURIComponent(source)}` : ''}`),
   getWords: (params = {}) => {
-    if (!params.chapterName) throw new Error('chapterName is required for getWords');
-    const query = new URLSearchParams();
-    query.set('chapter_name', params.chapterName);
-    return get(`/api/vocabulary/words?${query.toString()}`);
+    if (!params.chapterName)
+      throw new Error('chapterName is required for getWords')
+
+    const query = new URLSearchParams()
+    query.set('chapter_name', params.chapterName)
+    if (params.source)
+      query.set('source', params.source)
+
+    return get(`/api/vocabulary/words?${query.toString()}`)
   },
   search: query => get(`/api/vocabulary/search?q=${encodeURIComponent(query)}`),
   createCustomWord: wordData => post('/api/vocabulary/custom-words', wordData),
