@@ -10,7 +10,7 @@
 cd /opt/my-ielts-clean
 git pull
 docker compose build frontend
-docker compose up -d frontend
+docker compose up -d --no-deps frontend
 docker compose restart backend
 ```
 

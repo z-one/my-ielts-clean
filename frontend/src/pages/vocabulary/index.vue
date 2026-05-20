@@ -1,7 +1,7 @@
 <!-- eslint-disable eslint-comments/no-unlimited-disable -->
 <script setup generic="T extends any, O extends any">
 import { loadUserSettings as loadUserSettingsFromBackend, syncUserSettings, syncWordProgress, updateChapterStatus, updateWordFocusLevel } from '../../services/sync'
-import { CUSTOM_CHAPTER_NAME, createBackendCustomWords, loadChapterWords, clearChapterWordsCache, buildChapterStatusMap, loadChapterDetailsWithCache } from '../../services/vocabulary'
+import { CUSTOM_CHAPTER_NAME, buildChapterStatusMap, createBackendCustomWords, loadChapterDetailsWithCache, loadChapterWords } from '../../services/vocabulary'
 import { chaptersAPI, wordsAPI } from '../../api'
 import { useAuthStore } from '~/stores/auth'
 
@@ -43,22 +43,27 @@ const wordShowSourceMap = reactive(new Map())
 const wordHasInputMap = reactive(new Map())
 
 const trainingStats = ref('')
-const keyword = ref('')
 const chapters = ref([])
 const category = ref(localStorage.getItem(CHAPTER_KEY) || chapters.value[0])
 
 const loaded = ref(false)
-const refVocabulary = shallowReactive({})
+const refVocabulary = reactive({})
 const loadedChapters = ref(new Set()) // 已加载的章节
 const chapterDetails = ref([]) // 章节详情
 
-function replaceVocabulary(nextVocabulary) {
-  for (const key of Object.keys(refVocabulary))
-    delete refVocabulary[key]
-  Object.assign(refVocabulary, nextVocabulary)
-  chapters.value = Object.keys(refVocabulary)
-  const savedChapter = localStorage.getItem(CHAPTER_KEY)
-  category.value = savedChapter && refVocabulary[savedChapter] ? savedChapter : chapters.value[0]
+function refreshChapterView(chapterName) {
+  const chapter = refVocabulary[chapterName]
+  if (!chapter)
+    return
+
+  refVocabulary[chapterName] = {
+    ...chapter,
+    words: (chapter.words || []).map((group) => {
+      const nextGroup = group.map(item => ({ ...item }))
+      nextGroup.label = group.label
+      return nextGroup
+    }),
+  }
 }
 
 async function loadVocabularyData() {
@@ -134,6 +139,8 @@ async function loadChapterWordProgress(chapterName) {
         }
       }
     }
+
+    refreshChapterView(chapterName)
   }
   catch (error) {
     console.error(`加载章节 ${chapterName} 单词进度失败:`, error)
@@ -202,38 +209,6 @@ const totalPages = computed(() => {
   return Math.ceil(filteredWordGroups.value.length / wordsPerPage.value)
 })
 
-// 章节学习状态：计算每个章节的学习进度
-const chapterStatus = computed(() => {
-  const status = {}
-  for (const chapterName of chapters.value) {
-    const chapter = refVocabulary[chapterName]
-    if (!chapter || !chapter.words) {
-      status[chapterName] = { progress: 0, mastered: 0, total: 0, label: chapterName }
-      continue
-    }
-
-    let total = 0
-    let mastered = 0
-
-    for (const group of chapter.words) {
-      for (const item of group) {
-        total++
-        if ((item.correctCount || 0) >= MASTERY_COUNT)
-          mastered++
-      }
-    }
-
-    const progress = total > 0 ? Math.round((mastered / total) * 100) : 0
-    status[chapterName] = {
-      progress,
-      mastered,
-      total,
-      label: chapterName,
-    }
-  }
-  return status
-})
-
 // 过滤后的章节列表
 const filteredChapters = computed(() => {
   if (statusFilter.value === 'all')
@@ -245,35 +220,7 @@ const filteredChapters = computed(() => {
   })
 })
 
-const wordList = computed(() => {
-  const result = structuredClone(refVocabulary) // deep clone
-  // const keywordValue = keyword.value.trim().toLowerCase()
-  const categoryValue = category.value
-
-  if (categoryValue !== '') {
-    // for (const key in result) {
-    //   if (key !== categoryValue)
-    //     delete result[key]
-    // }
-    return { [categoryValue]: result[categoryValue] }
-  }
-
-  /* if (keywordValue !== '') {
-    for (const key in result) {
-      const category = result[key]
-      const words = []
-      category.words.forEach((group) => {
-        words.push(group.filter((item) => {
-          return item.word.toLowerCase().includes(keywordValue)
-        }))
-      })
-      category.words = words
-    }
-  } */
-  return {}
-})
-
-watch(category, async (newVal, oldVal) => {
+watch(category, async (newVal) => {
   // console.log(newVal, oldVal)
   localStorage.setItem(CHAPTER_KEY, newVal)
 
@@ -357,7 +304,6 @@ function applyProgress(progress) {
     return
 
   const words = refVocabulary[category.value].words
-  let appliedCount = 0
 
   for (const group of words) {
     for (const item of group) {
@@ -370,12 +316,11 @@ function applyProgress(progress) {
         item.showSource = saved.showSource || false
         item.focusLevel = saved.focusLevel ?? 0
         wordShowSourceMap.set(item.id, saved.showSource || false)
-        appliedCount++
       }
     }
   }
 
-  // console.log(`共应用了 ${appliedCount} 个单词的进度`)
+  refreshChapterView(category.value)
 }
 
 // 加载练习进度
@@ -474,26 +419,6 @@ function getChapterOptionClass(chapterName) {
   return getStatusColorClass(status)
 }
 
-// 获取关注等级文本
-function getFocusLevelText(level) {
-  const levelMap = {
-    0: '普通',
-    1: '关注',
-    2: '重点',
-  }
-  return levelMap[level] || '普通'
-}
-
-// 获取关注等级颜色类
-function getFocusLevelColorClass(level) {
-  const colorMap = {
-    0: 'text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400',
-    1: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400',
-    2: 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400',
-  }
-  return colorMap[level] || colorMap[0]
-}
-
 // 获取关注等级边框类
 function getFocusLevelBorderClass(level) {
   const colorMap = {
@@ -516,6 +441,8 @@ function setWordFocusLevel(item, level) {
   }
 
   item.focusLevel = level
+  refreshChapterView(category.value)
+
   // 使用防抖延迟保存，避免频繁操作导致音频中断
   if (saveProgressTimer)
     clearTimeout(saveProgressTimer)
@@ -546,44 +473,6 @@ function shouldShowWordSource(item) {
     return true
   // 练习模式：根据 Map 中的 showSource 或全局 isShowSource 判断
   return !!(wordShowSourceMap.get(item.id) || isShowSource.value)
-}
-
-// 保存所有章节的进度（包含 focusLevel）
-async function saveAllChaptersProgress() {
-  const progress = {
-    chapter: category.value,
-    words: {},
-  }
-
-  // 遍历当前章节所有单词
-  const words = refVocabulary[category.value].words
-  for (const group of words) {
-    for (const item of group) {
-      // 保存所有自定义属性
-      progress.words[item.id] = {
-        spellValue: item.spellValue || '',
-        spellError: item.spellError || false,
-        correctCount: item.correctCount || 0,
-        errorCount: item.errorCount || 0,
-        showSource: item.showSource || false,
-      }
-    }
-  }
-
-  // 已登录用户：同步到后端
-  if (authStore.isAuthenticated) {
-    try {
-      await syncWordProgress(category.value, progress)
-    }
-    catch (error) {
-      console.error('同步所有章节进度失败:', error)
-    }
-  }
-  else {
-    // 未登录用户：保存到 localStorage
-    const chapterProgressKey = `${PROGRESS_KEY}_${category.value}`
-    localStorage.setItem(chapterProgressKey, JSON.stringify(progress))
-  }
 }
 
 function calcStats() {
@@ -761,7 +650,7 @@ function play(audioPath) {
   try {
     audio = new Audio()
     audio.src = audioPath
-    audio.play().catch((error) => {
+    audio.play().catch(() => {
       // console.log('音频播放失败:', error)
       // 移动端可能需要用户交互才能播放
       if (isMobile.value) {
@@ -1199,6 +1088,8 @@ watch(wordsPerPage, async (newValue) => {
 
 // 初始化单词属性
 function initWordProperties() {
+  const shouldUseLocalProgress = !authStore.isAuthenticated
+
   // 初始化所有章节的单词属性
   for (const chapterKey in refVocabulary) {
     const chapter = refVocabulary[chapterKey]
@@ -1206,25 +1097,27 @@ function initWordProperties() {
       for (const group of chapter.words) {
         for (const item of group) {
           // 先尝试从本地存储加载该章节的进度数据
-          const chapterProgressKey = `${PROGRESS_KEY}_${chapterKey}`
-          try {
-            const progressData = localStorage.getItem(chapterProgressKey)
-            if (progressData) {
-              const savedProgress = JSON.parse(progressData)
-              if (savedProgress.words[item.id]) {
-                const saved = savedProgress.words[item.id]
-                item.showSource = saved.showSource !== undefined ? saved.showSource : false
-                item.spellValue = saved.spellValue || ''
-                item.spellError = saved.spellError || false
-                item.correctCount = saved.correctCount || 0
-                item.errorCount = saved.errorCount || 0
-                item.focusLevel = saved.focusLevel ?? 0
-                continue // 已恢复数据，跳过默认值初始化
+          if (shouldUseLocalProgress) {
+            const chapterProgressKey = `${PROGRESS_KEY}_${chapterKey}`
+            try {
+              const progressData = localStorage.getItem(chapterProgressKey)
+              if (progressData) {
+                const savedProgress = JSON.parse(progressData)
+                if (savedProgress.words[item.id]) {
+                  const saved = savedProgress.words[item.id]
+                  item.showSource = saved.showSource !== undefined ? saved.showSource : false
+                  item.spellValue = saved.spellValue || ''
+                  item.spellError = saved.spellError || false
+                  item.correctCount = saved.correctCount || 0
+                  item.errorCount = saved.errorCount || 0
+                  item.focusLevel = saved.focusLevel ?? 0
+                  continue // 已恢复数据，跳过默认值初始化
+                }
               }
             }
-          }
-          catch (error) {
-            console.error(`加载章节 ${chapterKey} 进度失败:`, error)
+            catch (error) {
+              console.error(`加载章节 ${chapterKey} 进度失败:`, error)
+            }
           }
 
           // 如果没有本地数据，才使用默认值
