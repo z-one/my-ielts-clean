@@ -2054,7 +2054,7 @@ watch(
             </div>
             <select
               :value="chapterLearnStatus[chapterName] || ChapterStatus.NOT_LEARNED"
-              class="ml-4 block w-32 border border-gray-300 rounded-lg bg-gray-50 p-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              class="ml-4 block w-[6.4rem] border border-gray-300 rounded-lg bg-gray-50 p-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               @change="setChapterStatus(chapterName, $event.target.value)"
             >
               <option :value="ChapterStatus.NOT_LEARNED">
