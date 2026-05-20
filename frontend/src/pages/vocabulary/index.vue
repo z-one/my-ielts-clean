@@ -761,23 +761,6 @@ function onInputKeydown(e) {
 function onInputFoucsIn(e, audioPath) {
   if (isAutoPlayWordAudio.value)
     play(audioPath)
-
-  // 自动朗读释义 - 简化版本
-  if (isAutoPlayMeaningAudio.value) {
-    const item = findItemById(e.target.id)
-    if (item && item.meaning && item.id !== lastSpokenWordId.value) {
-      // 防止重复朗读同一个单词
-      lastSpokenWordId.value = item.id
-
-      // 延迟一下，让单词音频先播放
-      const delay = isAutoPlayWordAudio.value ? 2000 : 800
-      setTimeout(() => {
-        if (lastSpokenWordId.value === item.id) { // 确保还是同一个单词
-          speakMeaning(item.meaning, item.word[0])
-        }
-      }, delay)
-    }
-  }
 }
 
 function onInputFoucsOut(e, item) {
