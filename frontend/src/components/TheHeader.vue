@@ -66,7 +66,7 @@ const showMobileMenu = ref(false)
         <div class="flex items-center justify-start">
           <a href="/" class="mr-14 flex">
             <span class="hidden self-center whitespace-nowrap text-2xl font-semibold sm:flex dark:text-white">My
-              <span class="ml-1 text-red-600"> IELTS™</span>
+              <span class="ml-1"> IELTS™</span>
             </span>
 
           </a>
